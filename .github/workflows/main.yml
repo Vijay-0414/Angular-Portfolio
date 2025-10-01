@@ -89,7 +89,7 @@ jobs:
         run: |
           CF_URL=$(aws cloudformation describe-stacks \
             --stack-name $STACK_NAME \
-            --query "Stacks[0].Outputs[?ExportName=='CloudFrontURL'].OutputValue" \
+            --query "Stacks[0].Outputs[?ExportName=='CloudFrontDomainName'].OutputValue" \
             --output text)
           echo "cf_url=$CF_URL" >> $GITHUB_OUTPUT
 
