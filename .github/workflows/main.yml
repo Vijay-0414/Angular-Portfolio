@@ -89,9 +89,12 @@ jobs:
         run: |
           CF_URL=$(aws cloudformation describe-stacks \
             --stack-name $STACK_NAME \
-            --query "Stacks[0].Outputs[?ExportName=='CloudFrontDomainName'].OutputValue" \
+            --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDomainName'].OutputValue" \
             --output text)
           echo "cf_url=$CF_URL" >> $GITHUB_OUTPUT
+
+      - name: Debug CF URL
+        run: echo "CF_URL = ${{ steps.cf-url.outputs.cf_url }}"
 
       - name: Show deployment URLs
         run: |
