@@ -63,9 +63,9 @@ jobs:
 
       - name: Sync build to S3
         run: |
-          DIST_FOLDER=$(ls dist/)
-          echo "Uploading ./dist/$DIST_FOLDER to S3 bucket $BUCKET_NAME..."
-          aws s3 sync ./dist/$DIST_FOLDER s3://$BUCKET_NAME/ --acl public-read
+          echo "Uploading ./docs/ to S3 bucket $BUCKET_NAME..."
+          aws s3 sync ./docs/ s3://$BUCKET_NAME/ --acl public-read --delete
+
 
       - name: Get CloudFront Distribution ID
         id: cf-id
