@@ -6,14 +6,10 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [18]
         
     env:
-      STACK_NAME: screening-plus-angular
-      BUCKET_NAME: screening-plus-angular-demo-7206
+      STACK_NAME: angular-portfolio-stack
+      BUCKET_NAME: angular-portfolio-demo-7206
       CFN_TEMPLATE: cfn/aws-cft.yaml
       #CNAME_ALIASES: screeningplusdemo.com,www.screeningplusdemo.com
       #ACM_CERT_ARN: arn:aws:acm:us-east-1:940146811379:certificate/a9111815-780d-4522-85f1-c1ecdd52238f
@@ -47,10 +43,10 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --parameter-overrides BucketName=$BUCKET_NAME CNAMEAliases=$CNAME_ALIASES ACMCertificateArn=$ACM_CERT_ARN
 
-      - name: Use Node.js ${{ matrix.node-version }}
+      - name: Install Node.js 
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 18
 
       - name: Install Angular dependencies
         run: npm install
@@ -65,7 +61,6 @@ jobs:
         run: |
           echo "Uploading ./docs/ to S3 bucket $BUCKET_NAME..."
           aws s3 sync ./docs/ s3://$BUCKET_NAME/ --acl public-read --delete
-
 
       - name: Get CloudFront Distribution ID
         id: cf-id
