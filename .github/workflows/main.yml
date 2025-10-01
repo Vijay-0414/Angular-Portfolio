@@ -1,0 +1,105 @@
+name: Angular Frontend Deployment
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18]
+        
+    env:
+      STACK_NAME: screening-plus-angular
+      BUCKET_NAME: screening-plus-angular-demo-7206
+      CFN_TEMPLATE: cfn/aws-cft.yaml
+      #CNAME_ALIASES: screeningplusdemo.com,www.screeningplusdemo.com
+      #ACM_CERT_ARN: arn:aws:acm:us-east-1:940146811379:certificate/a9111815-780d-4522-85f1-c1ecdd52238f
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Check if CloudFormation stack exists
+        id: stack-check
+        run: |
+          STACK_EXISTS=$(aws cloudformation describe-stacks \
+            --stack-name $STACK_NAME \
+            --query "Stacks[0].StackName" --output text 2>/dev/null || echo "NO")
+          echo "stack_exists=$STACK_EXISTS" >> $GITHUB_OUTPUT
+
+      - name: Deploy CloudFormation stack if not exists
+        if: steps.stack-check.outputs.stack_exists == 'NO'
+        run: |
+          echo "Creating CloudFormation stack..."
+          aws cloudformation deploy \
+            --stack-name $STACK_NAME \
+            --template-file $CFN_TEMPLATE \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameter-overrides BucketName=$BUCKET_NAME CNAMEAliases=$CNAME_ALIASES ACMCertificateArn=$ACM_CERT_ARN
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install Angular dependencies
+        run: npm install
+
+      - name: Install Angular CLI globally
+        run: npm install -g @angular/cli
+        
+      - name: Build Angular app
+        run:  npm run build -- --configuration production
+
+      - name: Sync build to S3
+        run: |
+          DIST_FOLDER=$(ls dist/)
+          echo "Uploading ./dist/$DIST_FOLDER to S3 bucket $BUCKET_NAME..."
+          aws s3 sync ./dist/$DIST_FOLDER s3://$BUCKET_NAME/ --acl public-read
+
+      - name: Get CloudFront Distribution ID
+        id: cf-id
+        run: |
+          CF_ID=$(aws cloudformation describe-stacks \
+            --stack-name $STACK_NAME \
+            --query "Stacks[0].Outputs[?ExportName=='CloudFrontDistributionID'].OutputValue" \
+            --output text)
+          echo "cf_id=$CF_ID" >> $GITHUB_OUTPUT
+
+      - name: Invalidate CloudFront cache
+        run: |
+          echo "Invalidating CloudFront cache..."
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ steps.cf-id.outputs.cf_id }} \
+            --paths "/*"
+
+      - name: Get CloudFront URL
+        id: cf-url
+        run: |
+          CF_URL=$(aws cloudformation describe-stacks \
+            --stack-name $STACK_NAME \
+            --query "Stacks[0].Outputs[?ExportName=='CloudFrontURL'].OutputValue" \
+            --output text)
+          echo "cf_url=$CF_URL" >> $GITHUB_OUTPUT
+
+      - name: Show deployment URLs
+        run: |
+          IFS=',' read -ra CNAMES <<< "$CNAME_ALIASES"
+          echo "-----------------------------------------------------"
+          echo "Deployment completed successfully!"
+          echo "Application URLs:"
+          echo " - https://${{ steps.cf-url.outputs.cf_url }}"
+          for cname in "${CNAMES[@]}"; do
+            echo " - https://$cname"
+          done
+          echo "-----------------------------------------------------"
