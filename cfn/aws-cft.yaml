@@ -79,7 +79,9 @@ Outputs:
   CloudFrontDistributionID:
     Description: "CloudFront Distribution ID"
     Value: !Ref CloudFrontDistribution
-
+    Export:
+      Name: CloudFrontDistributionID
+      
   CloudFrontDomainName:
     Description: "CloudFront Distribution Domain Name"
     Value: !GetAtt CloudFrontDistribution.DomainName
